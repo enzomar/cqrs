@@ -1,0 +1,109 @@
+version: "3.9"  # optional since v1.27.0
+services:
+
+  cache:
+    image: "redis:alpine"
+    ports:
+     - "6379:6379"
+    networks: 
+       - cqrs-intranet
+
+  db:
+    image: "mysql"
+    environment:
+      MYSQL_ROOT_USER: root
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: cqrs
+      MYSQL_USER: cqrs
+      MYSQL_PASSWORD: 123456
+    ports:
+      - "3306:3306"
+    networks: 
+      - cqrs-intranet
+    volumes:
+      - ./storage/init.sql:/data/application/init.sql
+
+
+  queue-manager:
+    image: wurstmeister/zookeeper:3.4.6
+    ports:
+      - "2181:2181"
+    networks: 
+       - cqrs-intranet
+
+
+  queue:
+    # https://www.confluent.io/blog/kafka-client-cannot-connect-to-broker-on-aws-on-docker-etc/
+    # https://medium.com/@marcelo.hossomi/running-kafka-in-docker-machine-64d1501d6f0b
+    # https://www.kaaproject.org/blog/kafka-docker
+    image: wurstmeister/kafka:2.11-2.0.0
+    ports:
+      - "19092:19092"   
+    links:
+      - queue-manager
+    networks: 
+      - cqrs-intranet
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: queue_manager:2181
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      KAFKA_CREATE_TOPICS: "items:1:1,status:1:1"
+      # listeners: The address the socket server listens on.
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092
+      # advertised.listeners: Hostname and port the broker will advertise to producers and consumers.
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL      
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+
+  storage:
+    build: ./storage
+    ports:
+      - 5001:5000
+    links:
+      - db
+      - queue
+
+  consumer:
+    build: ./consumer
+    ports:
+      - 5002:5000
+    links:
+      - queue
+
+  producer:
+    build: ./producer
+    ports:
+      - 5003:5000
+    links:
+      - queue
+      - storage
+
+  notifier:
+    build: ./notifier
+    ports:
+      - 5004:5000
+    links:
+      - queue
+
+  reader:
+    build: ./reader
+    ports:
+      - 5005:5000
+    links:
+      - cache
+      - storage
+
+  #loadbalancer:
+  #  image: nginx:latest
+  #  volumes:
+  #    - ./loadbalancer/nginx.conf:/etc/nginx/nginx.conf
+  #  ports:
+  #    - 8080:80
+  #    - 443:443
+
+networks:
+  cqrs-intranet:

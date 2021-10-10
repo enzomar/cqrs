@@ -1,0 +1,6 @@
+CREATE DATABASE IF NOT EXISTS cqrs;
+USE cqrs;
+CREATE TABLE IF NOT EXISTS items(
+	uuid varchar(36)  NOT NULL,
+	json JSON DEFAULT NULL
+);
