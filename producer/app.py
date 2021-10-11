@@ -1,15 +1,17 @@
-from flask import Flask
+from flask import Flask, abort, request
 app = Flask(__name__)
 from kafka import KafkaProducer
+import json
+import requests
 
 
-def fetch_new_uuid()
+def fetch_new_uuid():
     try:
         r = requests.post("http://localhost:5001/items")
         if r.status_code == 200:
             return r.json() 
         
-    except ex:
+    except Exception as ex:
         print(ex)
         abort(404)
 
@@ -21,13 +23,15 @@ def push_job(jitem):
 
 
 
-@app.route('/items/', methods=['POST'])
-def create(item):
+@app.route('/items', methods=['POST'])
+def create():
 
     # decode the request
     try:
-        jitem = request.get_json()
-    except ex:
+        print(request.data)
+        jitem = json.loads(request.data)
+        print(jitem)
+    except Exception as ex:
         print(ex)
         abort(404)
 
@@ -39,13 +43,10 @@ def create(item):
     try:
         jitem = json.dumps({"id": new_uuid, "request":request.get_json()})
         push_job(new_uuid, jitem)
-    except ex:
+    except Exception as ex:
         print(ex)
         abort(404)  
 
-
-
-    
     return 200
 
 

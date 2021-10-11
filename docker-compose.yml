@@ -66,6 +66,8 @@ services:
     links:
       - db
       - queue
+    networks: 
+      - cqrs-intranet
 
   consumer:
     build: ./consumer
@@ -73,6 +75,8 @@ services:
       - 5002:5000
     links:
       - queue
+    networks: 
+      - cqrs-intranet
 
   producer:
     build: ./producer
@@ -81,6 +85,8 @@ services:
     links:
       - queue
       - storage
+    networks: 
+      - cqrs-intranet
 
   notifier:
     build: ./notifier
@@ -88,6 +94,8 @@ services:
       - 5004:5000
     links:
       - queue
+    networks: 
+      - cqrs-intranet
 
   reader:
     build: ./reader
@@ -96,6 +104,9 @@ services:
     links:
       - cache
       - storage
+    networks: 
+      - cqrs-intranet
+
 
   #loadbalancer:
   #  image: nginx:latest

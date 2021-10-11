@@ -1,7 +1,7 @@
-from flask import Flask, abort, jsonify
+from flask import Flask, abort, jsonify, request
 import pymysql
 import pymysql.cursors
-
+import json
 import sys
 import uuid
 
@@ -11,7 +11,8 @@ app = Flask(__name__)
 def update_item(uuid, json):
     conn = connect()
     cur = conn.cursor()
-    cur.execute("INSERT INTO items (json) VALUES uuid=? WHERE uuid=?", (json, uuid))
+    insert = "UPDATE items SET json = %s WHERE uuid=%s"
+    cur.execute(insert, (json,uuid))
     conn.commit()
     conn.close()
 
@@ -19,20 +20,24 @@ def update_item(uuid, json):
 def create_empty_item(uuid):
     conn = connect()
     cur = conn.cursor()
-    cur.execute("INSERT INTO items (uuid) VALUES uuid=?", (uuid,'{}'))
-    item = cur[0]
+    cur.execute("INSERT INTO items (uuid) VALUES (%s)", (uuid))
     conn.commit()
     conn.close()
-    return item
+    return uuid
 
 
 def read_from_db(uuid):
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("SELECT json FROM items WHERE uuid=?", (uuid,))
-    item = cur[0]
-    conn.close()
-    return item
+    try:
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM items WHERE uuid=%s", (uuid))
+        items = cur.fetchall()
+        return items[0]
+    except Exception as ex:
+        print(ex)
+    finally:    
+        conn.close()
+
 
 
 def connect():
@@ -43,7 +48,8 @@ def connect():
             password="123456",
             host="db",
             port=3306,
-            database="cqrs"
+            database="cqrs",
+            cursorclass=pymysql.cursors.DictCursor
         )
     except Exception as ex:
         print("Error connecting to MySQL: {0}".format(ex))
@@ -60,7 +66,7 @@ def read(uuid):
     except Exception as ex:
         print(ex)
         abort(404)
-
+    print(item)
     return jsonify(item)
 
 
@@ -68,23 +74,31 @@ def read(uuid):
 def update(uuid):
     # decode the request
     try:
-        jitem = request.get_json()
+        print(request.data)
+        jitem = json.loads(request.data)
+        print(jitem)
     except Exception as ex:
         print(ex)
         abort(404)
     try:
-        update_item(uuid, jitem)
+        sitem = str(json.dumps(jitem))
+        #update_item(uuid, jitem)
+        update_item(uuid, sitem)
+
     except Exception as ex:
         print(ex)
-        abort(404)        
+        abort(404)
+    return jitem        
 
 
 @app.route('/items', methods=['POST'])
 def create():
     try:    
-        new_uuid = uuid.uuid4()
+        new_uuid = str(uuid.uuid4())
         create_empty_item(new_uuid)
+        print("new uuid created and added: {0}".format(new_uuid))
         return new_uuid
+
     except Exception as ex:
         print(ex)
         try:
